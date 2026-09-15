@@ -1,0 +1,92 @@
+# Local development stack: MongoDB as a single-node replica set, plus the API.
+#
+# The replica set is not optional. Flow writes an aggregate, its audit entry and its
+# project snapshot inside one multi-document transaction, and transactions do not exist on
+# a standalone mongod. A plain `mongo` service would appear to work until the first
+# transactional write failed.
+#
+#   docker compose up -d
+#   docker compose logs -f api
+#
+# The environment block below is also where the flat names in .env are translated into
+# the hierarchical names the application binds (JWT_SECRET_KEY -> JwtSettings__SecretKey,
+# and so on). That translation exists only here: running the API without Compose means
+# supplying the hierarchical names directly, or using appsettings or user secrets.
+
+name: flow
+
+services:
+  mongo:
+    image: mongo:8.0
+    container_name: flow-mongo
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
+    healthcheck:
+      # Initiates the replica set on first boot, then reports healthy only once this node
+      # is actually a writable primary. rs.status() throws while uninitiated, hence the
+      # try/catch; election takes a moment after initiate, hence the final check rather
+      # than trusting initiate's own return.
+      test: >
+        mongosh --quiet --eval "
+          try { rs.status() }
+          catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]}) }
+          quit(db.hello().isWritablePrimary ? 0 : 1)
+        "
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flow-api
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "5153:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+
+      Mongo__ConnectionString: mongodb://mongo:27017/?replicaSet=rs0
+      Mongo__Database: ${MONGO_DATABASE:-flow}
+
+      JwtSettings__SecretKey: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      JwtSettings__Issuer: ${JWT_ISSUER:-FlowAPI}
+      JwtSettings__Audience: ${JWT_AUDIENCE:-FlowApp}
+      JwtSettings__ExpiryMinutes: ${JWT_EXPIRY_MINUTES:-15}
+      Auth__RefreshTokenDays: ${REFRESH_TOKEN_DAYS:-7}
+
+      # Empty is a valid, supported state: the endpoints answer 503 and the rest of the
+      # product is unaffected.
+      Gemini__ApiKey: ${GEMINI_API_KEY:-}
+      Gemini__Model: ${GEMINI_MODEL:-gemini-3.8-flash}
+
+      OneSignal__AppId: ${ONESIGNAL_APP_ID:-}
+      OneSignal__ApiKey: ${ONESIGNAL_API_KEY:-}
+
+      # Lists reach .NET configuration as indexed keys, which is why these are not a
+      # single comma-separated variable.
+      ForwardedHeaders__Enabled: ${FORWARDED_HEADERS_ENABLED:-false}
+      ForwardedHeaders__TrustedNetworks__0: ${FORWARDED_TRUSTED_NETWORKS:-}
+      ForwardedHeaders__TrustedProxies__0: ${FORWARDED_TRUSTED_PROXIES:-}
+      ForwardedHeaders__ForwardLimit: ${FORWARDED_LIMIT:-1}
+
+      OpenTelemetry__OtlpEndpoint: ${OTLP_ENDPOINT:-}
+      Swagger__Enabled: ${SWAGGER_ENABLED:-true}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-}
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+  mongo-config:

@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="FluentAssertions" Version="6.12.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!--
+    References every layer on purpose: the point is to inspect what each one is allowed to
+    depend on, which cannot be done without being able to load them.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Flow.Domain\Flow.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Flow.Application\Flow.Application.csproj" />
+    <ProjectReference Include="..\..\src\Flow.Infrastructure\Flow.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Flow.API\Flow.API.csproj" />
+  </ItemGroup>
+
+</Project>

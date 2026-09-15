@@ -1,0 +1,151 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Flow API",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/v1/assistant/compare-ideas": {
+      "post": {}
+    },
+    "/api/v1/assistant/ideas/{ideaId}/project-draft": {
+      "post": {}
+    },
+    "/api/v1/auth/register": {
+      "post": {}
+    },
+    "/api/v1/auth/login": {
+      "post": {}
+    },
+    "/api/v1/auth/refresh": {
+      "post": {}
+    },
+    "/api/v1/auth/logout": {
+      "post": {}
+    },
+    "/api/v1/dashboard/summary": {
+      "get": {}
+    },
+    "/api/v1/dashboard/projects/{id}": {
+      "get": {}
+    },
+    "/api/v1/dashboard/strategies/{id}": {
+      "get": {}
+    },
+    "/api/v1/dashboard/insights": {
+      "post": {}
+    },
+    "/api/v1/guidelines": {
+      "get": {},
+      "post": {}
+    },
+    "/api/v1/guidelines/current": {
+      "get": {}
+    },
+    "/api/v1/guidelines/{id}": {
+      "get": {},
+      "put": {},
+      "delete": {}
+    },
+    "/api/v1/guidelines/{id}/history": {
+      "get": {}
+    },
+    "/api/v1/guidelines/{id}/close": {
+      "post": {}
+    },
+    "/api/v1/ideas": {
+      "post": {},
+      "get": {}
+    },
+    "/api/v1/ideas/{id}": {
+      "get": {},
+      "put": {},
+      "delete": {}
+    },
+    "/api/v1/ideas/compare": {
+      "post": {}
+    },
+    "/api/v1/ideas/{id}/submit": {
+      "post": {}
+    },
+    "/api/v1/ideas/{id}/approve": {
+      "post": {}
+    },
+    "/api/v1/ideas/{id}/reject": {
+      "post": {}
+    },
+    "/api/v1/ideas/{id}/priority": {
+      "patch": {}
+    },
+    "/api/v1/ideas/{id}/score": {
+      "patch": {}
+    },
+    "/api/v1/ideas/{id}/flow-score": {
+      "put": {}
+    },
+    "/api/v1/ideas/{id}/comments": {
+      "get": {},
+      "post": {}
+    },
+    "/api/v1/notifications": {
+      "get": {}
+    },
+    "/api/v1/notifications/{id}/read": {
+      "post": {}
+    },
+    "/api/v1/notifications/read-all": {
+      "post": {}
+    },
+    "/api/v1/projects": {
+      "post": {},
+      "get": {}
+    },
+    "/api/v1/ideas/{ideaId}/convert": {
+      "post": {}
+    },
+    "/api/v1/projects/{id}": {
+      "get": {},
+      "put": {}
+    },
+    "/api/v1/projects/{id}/progress": {
+      "patch": {}
+    },
+    "/api/v1/projects/{id}/stage": {
+      "patch": {}
+    },
+    "/api/v1/projects/{id}/start": {
+      "post": {}
+    },
+    "/api/v1/projects/{id}/complete": {
+      "post": {}
+    },
+    "/api/v1/projects/{id}/cancel": {
+      "post": {}
+    },
+    "/api/v1/projects/{id}/block": {
+      "post": {}
+    },
+    "/api/v1/projects/{id}/unblock": {
+      "post": {}
+    },
+    "/api/v1/projects/{id}/timeline": {
+      "get": {}
+    },
+    "/api/v1/projects/{id}/snapshots": {
+      "get": {}
+    },
+    "/api/v1/projects/{projectId}/result": {
+      "get": {},
+      "put": {}
+    },
+    "/api/v1/users/me/points": {
+      "get": {}
+    },
+    "/api/v1/users/me/points/ledger": {
+      "get": {}
+    },
+    "/api/v1/users/{id}/points": {
+      "get": {}
+    }
+  }
+}

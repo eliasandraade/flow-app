@@ -1,0 +1,363 @@
+name: CI
+
+# Pushes cover the branches we work on directly. Pull requests cover everything else, and
+# that is not only forks: a branch of this repository proposing a merge into master is not
+# covered by the push trigger either, so skipping its pull request run means the change
+# reaches master with nothing having looked at it.
+#
+# The overlap is real but small — a pull request opened from master or sprint-2 itself gets
+# built twice for the same commit. That is the entire cost of the simple rule, and it is
+# worth far less than knowing every proposed merge was actually validated.
+on:
+  push:
+    branches: [master, sprint-2]
+  pull_request:
+    branches: [master, sprint-2]
+
+# A new commit makes the previous run obsolete. Cancelling it frees the runner instead of
+# spending minutes proving something about code nobody will merge.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only. Nothing here publishes, comments or tags, so nothing here needs to be able to.
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  NODE_VERSION: '20.x'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  backend:
+    name: Backend — build and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Keyed on the project files, which is what actually determines the package graph.
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore Flow.sln
+
+      - name: Build (Release)
+        run: dotnet build Flow.sln -c Release --no-restore
+
+      # The integration suite talks to a real MongoDB replica set, brought up by
+      # Testcontainers against the Docker daemon the runner provides. There is deliberately
+      # no fallback: a test that cannot reach a database fails rather than passing quietly,
+      # so a green run here means the database tests really ran.
+      #
+      # One project at a time, each writing a file named after itself. Running the solution
+      # in one command takes a single --logger for all of them, and the only way to keep the
+      # files apart there is LogFilePrefix, which appends a timestamp resolved to the second:
+      # two projects finishing inside the same second share a file and the guard below reads
+      # one project's totals as the whole suite. A name chosen per project cannot collide,
+      # whatever the runner's timing happens to be.
+      #
+      # A failing project does not stop the loop. Running the rest costs a few minutes and
+      # gives the whole picture, and it keeps the guard reporting "N failed" rather than
+      # "results missing", which is a different and far more confusing diagnosis.
+      - name: Test (Release)
+        run: |
+          set -uo pipefail
+          status=0
+
+          for project in tests/*/*.csproj; do
+            name=$(basename "$project" .csproj)
+            echo "::group::$name"
+            dotnet test "$project" -c Release --no-build \
+              --logger "trx;LogFileName=$name.trx" \
+              --results-directory ./test-results || status=1
+            echo "::endgroup::"
+          done
+
+          exit $status
+
+      # A skipped test is invisible in a summary line, and so is a suite that quietly
+      # stopped running one of its projects. This makes both loud.
+      - name: Refuse skipped or missing tests
+        if: always()
+        env:
+          # The suite only grows. A floor a little under the current count catches a project
+          # that stopped reporting without needing an edit for every test added.
+          MINIMUM_TESTS: '325'
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          projects=(tests/*/*.csproj)
+          missing=0
+
+          # Each file is named after its project, so a project that did not report can be
+          # named instead of showing up as an arithmetic discrepancy.
+          for project in "${projects[@]}"; do
+            name=$(basename "$project" .csproj)
+            if [ ! -s "./test-results/$name.trx" ]; then
+              echo "::error::$name produced no result file; that project did not report."
+              missing=1
+            fi
+          done
+
+          [ "$missing" -eq 0 ] || exit 1
+
+          files=(./test-results/*.trx)
+          echo "Found ${#files[@]} result files for ${#projects[@]} test projects."
+
+          # Named files cannot collide, so a file beyond the expected set came from
+          # somewhere else and would be summed into the totals below.
+          if [ ${#files[@]} -ne ${#projects[@]} ]; then
+            echo "::error::Expected exactly one result file per test project."
+            exit 1
+          fi
+
+          # The counters are named by the trx schema, not by the console summary: a skipped
+          # test is "notExecuted" there, and there is no "skipped" attribute at all. Summing
+          # a name that never appears would report zero skipped forever.
+          sum() {
+            grep -ho "$1=\"[0-9]*\"" "${files[@]}" | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}'
+          }
+
+          total=$(sum total)
+          executed=$(sum executed)
+          not_executed=$(sum notExecuted)
+          failed=$(sum failed)
+
+          echo "total=$total executed=$executed notExecuted=$not_executed failed=$failed"
+
+          if [ "$not_executed" != "0" ] || [ "$total" != "$executed" ]; then
+            echo "::error::$not_executed test(s) did not run. The suite must run in full."
+            exit 1
+          fi
+
+          if [ "$failed" != "0" ]; then
+            echo "::error::$failed test(s) failed."
+            exit 1
+          fi
+
+          if [ "$total" -lt "$MINIMUM_TESTS" ]; then
+            echo "::error::Only $total tests ran; at least $MINIMUM_TESTS were expected."
+            exit 1
+          fi
+
+          echo "All $total tests ran and passed."
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ./test-results
+          retention-days: 7
+
+  mobile:
+    name: Mobile — typecheck and doctor
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install (from the lockfile)
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # Checks the dependency graph against what the Expo SDK actually pins. This is the
+      # gate that caught the charting library conflict during the sprint.
+      - name: Expo doctor
+        run: npx expo-doctor
+
+      # Bundles the app for Android. No credentials involved: it proves the project packages,
+      # which is a different thing from the signed APK that still needs an EAS account.
+      - name: Bundle for Android
+        run: npx expo export --platform android
+
+  docker:
+    name: Docker image and compose stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Ephemeral and never committed — .env is gitignored. The value is a throwaway that
+      # only has to satisfy the length check the API enforces at startup.
+      - name: Write a throwaway environment
+        run: |
+          set -euo pipefail
+          {
+            echo "ASPNETCORE_ENVIRONMENT=Development"
+            echo "JWT_SECRET_KEY=$(openssl rand -base64 48 | tr -d '\n')"
+            echo "SEED_DEMO_DATA=false"
+          } > .env
+
+      # The Dockerfile and the compose file were written and reviewed but never built: the
+      # development machine has a Docker Desktop that does not start. This job is where they
+      # are actually exercised for the first time.
+      - name: Build the image
+        run: docker compose build
+
+      # Brings up MongoDB as a single-node replica set and the API on top of it. The
+      # compose healthcheck initiates the set and only reports healthy once the node is a
+      # writable primary, which is what the API waits on.
+      - name: Start the stack
+        run: docker compose up -d
+
+      # Liveness says the process is up; readiness says it can actually serve, which here
+      # means MongoDB answered and the indexes exist. Waiting on readiness is what proves
+      # the replica set and the application came up together.
+      - name: Wait for readiness
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:5153/health/ready > /dev/null 2>&1; then
+              echo "The stack is ready."
+              exit 0
+            fi
+            sleep 3
+          done
+
+          echo "::error::The stack never reported ready."
+          exit 1
+
+      - name: Check both probes
+        run: |
+          set -euo pipefail
+          echo "live:"
+          curl -fsS http://localhost:5153/health/live
+          echo
+          echo "ready:"
+          curl -fsS http://localhost:5153/health/ready
+          echo
+
+      # Proves the container serves the product and not just a health endpoint, and that
+      # its own configuration validation let it start.
+      - name: Check the API answers
+        run: |
+          set -euo pipefail
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5153/api/v1/projects)
+          echo "GET /api/v1/projects -> $status"
+          test "$status" = "401" || { echo "::error::Expected 401 from an anonymous call, got $status."; exit 1; }
+
+      - name: Logs
+        if: always()
+        run: docker compose logs --no-color --tail 200 || true
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v || true
+
+  artifacts:
+    name: Delivery artefacts and OpenAPI
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: backend
+
+    # The specification is exported from the running application rather than from a copy
+    # kept by hand, and the application does not start without a database: it seeds the
+    # Identity roles before serving anything. A standalone server is enough here — nothing
+    # on the startup path opens a transaction, so no replica set is needed.
+    services:
+      mongo:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      # First and cheap. build-artifacts.sh refuses to publish a specification that this
+      # check rejects, so a broken check either blocks a good export or waves a bad one
+      # through — both worth finding before the export runs.
+      - name: Test the specification contract
+        run: node --test scripts/*.test.mjs
+
+      # Runs the packaging script three times with its test command stubbed, to prove it
+      # refuses to package a delivery when the suite is red. Production never exercises
+      # that path — a normal run means the tests passed — which is how it went fail-open
+      # unnoticed. Costs about a minute; the alternative is trusting the branch nobody
+      # runs. Needs the mongo service, since the OpenAPI export is not stubbed out.
+      - name: Test the packaging contract
+        env:
+          Mongo__ConnectionString: mongodb://localhost:27017
+          Mongo__Database: flow_openapi_export
+        run: bash scripts/build-artifacts.contract.test.sh
+
+      # The suite already ran in the backend job; repeating it here would pull the MongoDB
+      # image a second time to prove the same thing.
+      - name: Build the delivery artefacts
+        env:
+          FLOW_SKIP_TESTS: '1'
+          Mongo__ConnectionString: mongodb://localhost:27017
+          Mongo__Database: flow_openapi_export
+        run: ./scripts/build-artifacts.sh
+
+      # The same contract the export applies to its candidate, applied again to the file
+      # that actually landed in dist/. One definition in scripts/check-openapi.mjs, so the
+      # two cannot drift into disagreeing about what a valid specification is — and unlike
+      # counting endpoints, it also catches a document that is large, well-formed, and
+      # simply not ours.
+      - name: Check the exported specification
+        run: node scripts/check-openapi.mjs dist/presentation-assets/openapi.json
+
+      # Source and documentation only. Nothing here carries a credential: .env is not in the
+      # repository, and .env.example holds empty placeholders.
+      - name: Upload the artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: flow-artifacts
+          path: |
+            dist/presentation-assets/openapi.json
+            dist/presentation-assets/endpoints.txt
+          retention-days: 14
