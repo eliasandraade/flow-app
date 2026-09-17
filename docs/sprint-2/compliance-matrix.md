@@ -784,11 +784,14 @@ Nenhuma delas depende de código que falte escrever.
 
 | Item | O que falta | Comportamento hoje |
 |---|---|---|
-| Chamada real ao `gemini-3.8-flash` | `Gemini__ApiKey` | Endpoints inteligentes respondem `503`; o resto funciona igual |
 | Entrega real de push | Credencial OneSignal/FCM | Central de avisos funciona; o outbox mantém as mensagens **pendentes**, sem fingir entrega |
 | Visualização em coletor OTLP | Um coletor | Instrumentação ativa em processo; a API sobe normalmente |
 
-> Nenhum destes foi marcado como sucesso. O produto trata a ausência de credencial como um
+> A chamada real ao `gemini-3.8-flash` saiu desta lista em 17/09/2026: foi executada contra
+> o serviço real, com structured output aceito e registro em `assistant_runs`. A evidência
+> está em [`delivery-checklist.md`](delivery-checklist.md#13-validação-real-do-gemini).
+
+> Nenhum dos itens acima foi marcado como sucesso. O produto trata a ausência de credencial como um
 > estado previsto, e os testes verificam justamente esse estado.
 
 ---
