@@ -121,7 +121,7 @@ Legenda: ✅ verificado em execução · ⏳ pendente de credencial ou ambiente
 | Timeout, circuit breaker, sem retry cego | ✅ 5 testes de breaker |
 | Governança em `assistant_runs` | ✅ inclusive falhas |
 | Chave apenas server-side | ✅ |
-| **Chamada real ao `gemini-3.8-flash`** | ⏳ falta `GEMINI_API_KEY` |
+| **Chamada real ao `gemini-3.8-flash`** | ✅ validada contra o serviço real — ver [§13](#13-validação-real-do-gemini) |
 
 ---
 
@@ -225,14 +225,16 @@ build-artifacts.contract.test.sh    15   nenhuma entrega com suíte vermelha
 
 ## 11. Pendências reais
 
-Três itens, **todos** dependendo de credencial externa. Nenhum depende de código que falte
+Dois itens, **ambos** dependendo de credencial externa. Nenhum depende de código que falte
 escrever, e nenhum pode ser resolvido por engenharia — só por acesso.
 
 | # | Pendência | Bloqueio | O que falta |
 |---|---|---|---|
-| 1 | Chamada real ao Gemini | Sem `Gemini__ApiKey` | Definir a variável e chamar `POST /dashboard/insights` |
-| 2 | Push real via OneSignal | Sem credencial OneSignal/FCM | Definir App ID e REST API key |
-| 3 | APK assinado e deploy HTTPS | Sem credencial EAS e Dokploy | `eas build -p android --profile preview`; publicar no Dokploy |
+| 1 | Push real via OneSignal | Sem credencial OneSignal/FCM | Definir App ID e REST API key |
+| 2 | APK assinado e deploy HTTPS | Sem credencial EAS e Dokploy | `eas build -p android --profile preview`; publicar no Dokploy |
+
+A chamada real ao Gemini **deixou de ser pendência**: foi executada contra o serviço real em
+17/09/2026 e está registrada na [§13](#13-validação-real-do-gemini).
 
 O build da imagem e o `docker compose up` **deixaram de ser pendência**: o job de Docker da
 CI faz os dois a cada push, em runner limpo.
@@ -272,3 +274,54 @@ npx expo export --platform android    # bundle gerado
 # artefatos
 ./scripts/build-artifacts.sh          # dist/
 ```
+
+---
+
+## 13. Validação real do Gemini
+
+Executada em 17/09/2026 contra o serviço real, pelo caminho completo da aplicação:
+HTTP → `DashboardController` → `GenerateExecutiveInsightsCommand` →
+`GeminiExecutiveInsightService` → `GeminiStructuredClient` → Gemini → parsing → HTTP.
+Nenhuma linha de código ou de configuração foi alterada para isso.
+
+| Item | Resultado |
+|---|---|
+| Endpoint | `POST /api/v1/dashboard/insights`, perfil Leadership |
+| Modelo | `gemini-3.8-flash`, o mesmo já configurado |
+| HTTP | **200** |
+| Latência | 18,0 s (uma execução anterior levou 11,1 s) |
+| Structured output | aceito: `responseMimeType: application/json` com `responseJsonSchema` |
+| Parsing | bem-sucedido, sem fallback para texto livre |
+| Tokens | 2.365 de prompt, 2.145 de resposta |
+| Conteúdo | resumo executivo, 3 destaques, 3 riscos, 2 oportunidades, 2 recomendações |
+| Evidências | 31 citações no formato `campo = valor`, e `evidenceWasSufficient: true` |
+| `assistant_runs` | registro com `outcome = Success`, modelo, latência, tokens e `correlationId` |
+
+O banco foi um MongoDB 8.0 real em replica set, com o seed de demonstração — os números
+citados pelo modelo são os do painel daquele conjunto de dados.
+
+### Disponibilidade observada do provedor
+
+De 14 execuções registradas em `assistant_runs` durante a validação, 2 terminaram em
+`Success` e as demais em `Unavailable` ou `Timeout`. A causa está do lado do provedor e vem
+identificada na própria resposta:
+
+```text
+503 UNAVAILABLE: This model is currently experiencing high demand.
+Spikes in demand are usually temporary. Please try again later.
+```
+
+O Flow trata cada uma dessas exatamente como o contrato prevê: `503` com `ProblemDetails`,
+`traceId`, o restante do produto funcionando e o `assistant_run` registrando a falha com o
+tipo correto. O cliente não faz retry por decisão de projeto, já registrada — geração de
+conteúdo é um POST medido e não idempotente. Com a taxa de indisponibilidade observada
+acima, um retry com backoff seria a evolução natural, e fica anotado como decisão em
+aberto, não como defeito.
+
+### Caminhos de falha, verificados na mesma rodada
+
+| Cenário | Resultado |
+|---|---|
+| Sem chave | `503`, `errorKind = NotConfigured`, latência 0, aplicação de pé |
+| Chave inválida | `503`, `errorKind = Unavailable`, chamada externa real de 654 ms, nada sensível no log |
+| Timeout e circuit breaker | cobertos pela suíte automatizada, sem provocar o serviço real |
