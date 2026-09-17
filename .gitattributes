@@ -1,0 +1,37 @@
+# Line endings are a portability question, not a style preference.
+#
+# Git for Windows ships with core.autocrlf=true, so a clone there writes CRLF into the
+# working tree, and a contributor whose config differs can commit those carriage returns
+# straight back into the repository. The damage lands on Linux, where a trailing carriage
+# return is part of the command: a shebang becomes "bad interpreter" and a shell line
+# becomes $'\r': command not found. Declaring it here settles it once, for every machine,
+# instead of depending on each developer's configuration being right.
+
+# Whatever a platform wrote, text is stored normalised as LF in the repository. This is the
+# rule that actually closes the hole: it is what stops carriage returns from being committed
+# in the first place.
+* text=auto
+
+# Read or executed by Linux, so these have to be LF in the working tree as well, not only
+# inside the repository.
+
+# Invoked as ./scripts/*.sh by the README and by the CI; a carriage return breaks the
+# shebang and every command line after it.
+*.sh         text eol=lf
+
+# .github/workflows/ci.yml embeds multi-line `run:` blocks that the runner hands to bash,
+# and docker-compose.yml supplies environment values to containers. YAML itself tolerates
+# CRLF; the shell and the values inside it do not.
+*.yml        text eol=lf
+*.yaml       text eol=lf
+
+# Shell-form RUN lines are passed to /bin/sh -c inside the image, carriage return included.
+Dockerfile   text eol=lf
+
+# Copied to .env and read by docker compose. A carriage return here lands inside a value —
+# the JWT secret, for instance — and fails as if the credential were wrong.
+.env.example text eol=lf
+
+# The only binary assets in the repository. Auto-detection already gets these right; saying
+# so explicitly means a checkout never depends on that heuristic.
+*.png binary
