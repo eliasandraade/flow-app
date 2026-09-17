@@ -59,9 +59,9 @@ public class CiWorkflowTests
     [InlineData("pull_request")]
     public void BothTriggersCoverTheProtectedBranches(string trigger)
     {
-        // Pushes cover the branches we work on directly; pull requests cover everything
-        // else, which includes a branch of this repository proposing a merge into one of
-        // them. Dropping either leaves a way to reach master unchecked.
+        // This repository publishes from main alone. Pushes cover main directly; pull
+        // requests cover everything proposed into it, which includes a branch of this
+        // repository. Dropping either leaves a way to reach main unchecked.
         var block = Regex.Match(
             Workflow,
             $@"^  {trigger}:\s*\n\s+branches:\s*\[(?<branches>[^\]]*)\]",
@@ -69,9 +69,12 @@ public class CiWorkflowTests
 
         block.Success.Should().BeTrue(because: $"{trigger} must be a trigger with a branch list");
 
-        var branches = block.Groups["branches"].Value;
-        branches.Should().Contain("master");
-        branches.Should().Contain("sprint-2");
+        // Whole entries, not a substring: "main" must be a branch in the list, not part of
+        // some other name.
+        var branches = block.Groups["branches"].Value
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+        branches.Should().Contain("main");
     }
 
     [Fact]

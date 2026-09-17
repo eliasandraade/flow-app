@@ -3,6 +3,12 @@
 Documento de controle da Sprint 2 do Flow. Cada requisito obrigatório é rastreado desde a
 auditoria inicial do código até a evidência final de verificação.
 
+> Este documento registra a execução original da Sprint 2, feita na branch `sprint-2` do
+> repositório de desenvolvimento [`eliasandraade/flow`](https://github.com/eliasandraade/flow).
+> Branch, baseline e SHAs abaixo se referem a essa origem. A entrega pública é
+> [`eliasandraade/flow-app`](https://github.com/eliasandraade/flow-app), na branch `main`, e a
+> validação atual dela está em [`delivery-checklist.md`](delivery-checklist.md).
+
 - **Branch:** `sprint-2`
 - **Baseline auditado:** `ff00816a3f5b6d5f09ab3576a2ce185785e046c4` (`master`, "chore: establish clean project baseline")
 - **Baseline de testes:** 121 testes verdes (82 `Flow.Application.Tests` + 39 `Flow.API.Tests`)
@@ -12,12 +18,12 @@ auditoria inicial do código até a evidência final de verificação.
 ### Estado no fechamento
 
 - **Build:** `dotnet build Flow.sln` — 0 erros, **0 avisos**
-- **Testes:** **313** (124 Domain + 10 Application + 9 Architecture + 170 Integration contra MongoDB real), 0 falhas
+- **Testes:** **332** (124 Domain + 10 Application + 16 Architecture + 182 Integration contra MongoDB real), 0 falhas, 0 ignorados; mais 10 testes do contrato do OpenAPI e 15 verificações do contrato de empacotamento
 - **API:** 54 endpoints, `openapi.json` exportado da própria aplicação
 - **Mobile:** 23 telas, `tsc --noEmit` limpo, `expo-doctor` 18/18, bundle Android gerado
 - **Compliance:** **110 de 113** requisitos `VERIFIED` — ver [seção 10](#10-estado-final-por-área)
 - **Pendências:** 2, ambas por credencial externa — ver [seção 11](#11-pendências-reais)
-- **CI:** `.github/workflows/ci.yml`, quatro jobs, **verde** — ver [seção 14.5](#145-ci)
+- **CI:** `.github/workflows/ci.yml`, quatro jobs, em todo push e pull request para `main` no repositório público — ver [seção 14.5](#145-ci) e o badge do README
 
 > As seções 1 a 5 registram a auditoria e o plano do início da Sprint, e são mantidas como
 > estavam: elas são o ponto de partida contra o qual o resultado é comparado. O estado
@@ -936,3 +942,6 @@ artefatos conferindo o `openapi.json` exportado da aplicação.
 | 09/09/2026 | Fase 4 | CORS, rate limiting, Serilog, OpenTelemetry, health checks, métricas de negócio ligadas de fato, Docker, compose, artefatos, README e os nove documentos. Suíte final de **213 testes**. |
 | 09/09/2026 | Revisão | Cinco correções de segurança e concorrência (seção 13): IDOR, rotação atômica de refresh token, idempotência do push, claim atômico do outbox e rate limit por usuário. 60 testes novos; suíte de **273**. |
 | 10/09/2026 | Hardening 2 | Semântica de retry das transações, forwarded headers atrás do Traefik, contrato real do OneSignal, fencing de lease no outbox, guardas de arquitetura e CI no GitHub Actions. 40 testes novos; suíte de **313**. |
+| 10–11/09/2026 | Hardening 3 | CI validando todo pull request, entradas vazias de forwarded headers vindas do Compose, resultado de teste nomeado por projeto, export do `openapi.json` com origem verificada e empacotamento recusando suíte vermelha. 19 testes .NET novos; suíte de **332**. Contratos dos scripts: 10 testes do OpenAPI e 15 verificações de empacotamento. |
+| 15/09/2026 | Publicação | Resultado final da `sprint-2` (`0925d04`) publicado em `eliasandraade/flow-app`, na branch `main`, com a mesma árvore. |
+| 17/09/2026 | Repositório público | CI e documentação alinhadas à `main` do repositório público. |

@@ -283,7 +283,7 @@ O que a máquina de desenvolvimento não consegue rodar, a CI roda. O workflow
 | **Backend** | `restore`, `build -c Release`, suíte completa contra MongoDB real via Testcontainers, e um passo que **falha se algum teste for pulado** |
 | **Mobile** | `npm ci`, `tsc --noEmit`, `expo-doctor`, `expo export --platform android` |
 | **Docker** | `docker compose build` e `docker compose up`, esperando o `/health/ready` — é aqui que o Dockerfile e o compose são construídos pela primeira vez |
-| **Artefatos** | `build-artifacts.sh` e conferência do `openapi.json` exportado da aplicação |
+| **Artefatos** | contrato do `openapi.json` (10 testes), contrato de empacotamento (15 verificações), `build-artifacts.sh` e conferência de origem do `openapi.json` exportado da aplicação |
 
 Sem segredo nenhum: o `.env` do job de Docker é gerado na hora, com um valor descartável, e
 `.env` não está no repositório. As permissões do workflow são `contents: read`.

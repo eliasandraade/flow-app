@@ -2,10 +2,34 @@
 
 Estado real de cada item, verificado contra o código e a execução, não contra a intenção.
 
-- **Branch:** `sprint-2`
-- **Base:** `ff00816` (`master`)
-- **Build:** `dotnet build Flow.sln` — 0 erros, 0 avisos
-- **Testes:** 313, todos verdes
+### Origem da Sprint 2
+
+A Sprint 2 foi desenvolvida no repositório de desenvolvimento
+[`eliasandraade/flow`](https://github.com/eliasandraade/flow), na branch `sprint-2`, a partir
+da base `ff00816` (`master`). O último commit dessa branch é `0925d04`, e o registro de como
+se chegou até ele está em [`compliance-matrix.md`](compliance-matrix.md).
+
+### Snapshot público
+
+Este repositório, [`eliasandraade/flow-app`](https://github.com/eliasandraade/flow-app), é a
+entrega pública. O commit que publicou o conteúdo, `410ddf8`, tem **exatamente a mesma árvore**
+(`0a9fea0`) que o `0925d04` da origem: o código publicado é, byte a byte, o que foi validado
+lá. O que mudou depois foi só o alinhamento ao repositório público: os gatilhos da CI, o
+teste que guarda esses gatilhos e esta documentação. Nenhum código de aplicação.
+
+### Branch pública
+
+`main` é a única branch. A CI ([`ci.yml`](../../.github/workflows/ci.yml)) roda em todo push e
+em todo pull request para ela; o estado atual aparece no badge do README.
+
+### Validação atual
+
+Executada neste repositório, não herdada da origem:
+
+- **Build:** `dotnet build Flow.sln -c Release` — 0 erros, 0 avisos
+- **Testes .NET:** 332, todos verdes, nenhum ignorado
+- **Contrato do OpenAPI:** 10 de 10 (`node --test scripts/*.test.mjs`)
+- **Contrato de empacotamento:** 15 de 15 verificações (`scripts/build-artifacts.contract.test.sh`)
 - **Mobile:** `tsc --noEmit` limpo, `expo-doctor` 18/18, bundle Android gerado
 
 Legenda: ✅ verificado em execução · ⏳ pendente de credencial ou ambiente
@@ -28,7 +52,7 @@ Legenda: ✅ verificado em execução · ⏳ pendente de credencial ou ambiente
 | Progresso e resultados | ✅ | Operação dedicada + estimado/realizado |
 | Dashboard | ✅ | 1 endpoint, ~40 métricas, datasets prontos |
 | Integração real com o mobile | ✅ | REST, sem mocks |
-| APIs funcionais sem mock | ✅ | 170 testes de integração contra Mongo real |
+| APIs funcionais sem mock | ✅ | 182 testes de integração contra Mongo real |
 | MongoDB ou outro NoSQL | ✅ | MongoDB 8.0, driver oficial 3.11.1 |
 | Serviços externos | ✅ | Gemini e OneSignal implementados |
 | Auditoria | ✅ | Append-only, transacional |
@@ -158,10 +182,14 @@ Legenda: ✅ verificado em execução · ⏳ pendente de credencial ou ambiente
 ```text
 Flow.Domain.Tests          124   invariantes, máquinas de estado, FlowScore
 Flow.Application.Tests      10   aritmética do dashboard nos casos de borda
-Flow.Architecture.Tests      9   fronteiras entre as camadas
-Flow.Integration.Tests     170   MongoDB real, transações reais, API ponta a ponta
+Flow.Architecture.Tests     16   fronteiras entre as camadas e contrato da CI
+Flow.Integration.Tests     182   MongoDB real, transações reais, API ponta a ponta
 ─────────────────────────────
-Total                      313   0 falhas
+Total                      332   0 falhas, 0 ignorados
+
+Contratos dos scripts de entrega
+check-openapi.test.mjs              10   origem e identidade do openapi.json
+build-artifacts.contract.test.sh    15   nenhuma entrega com suíte vermelha
 ```
 
 | Área exigida | Cobertura |
@@ -185,7 +213,7 @@ Total                      313   0 falhas
 | `Dockerfile` multi-stage, usuário não-root | ✅ escrito |
 | `docker-compose.yml` com replica set | ✅ escrito |
 | `.env.example` sem segredo real | ✅ |
-| `scripts/build-artifacts.sh` | ✅ |
+| `scripts/build-artifacts.sh` | ✅ fail-closed: não empacota com suíte vermelha nem publica spec de outra origem |
 | Export de `openapi.json` | ✅ 54 endpoints, 73 schemas |
 | `eas.json` com profile APK | ✅ |
 | 10 documentos em `docs/sprint-2/` | ✅ os 9 exigidos + `flowscore.md` |
@@ -215,7 +243,7 @@ O Docker Desktop está instalado, os processos iniciam, mas a distro WSL `docker
 fica em `Stopped` e `docker desktop status` trava. Foram tentadas inicialização direta,
 `docker desktop start` e restart completo com `wsl --shutdown`. Isso continua assim.
 
-Não bloqueou o trabalho em nenhum momento. Localmente, os 170 testes de integração rodam
+Não bloqueou o trabalho em nenhum momento. Localmente, os 182 testes de integração rodam
 contra um **MongoDB 8.0.30 real em replica set de nó único** — com transações reais, commit
 e abort verificados — e o fixture aceita `FLOW_TEST_MONGO_URI` exatamente para isso, caindo
 em Testcontainers onde houver daemon. Na CI, onde há daemon, é Testcontainers que sobe o
@@ -227,9 +255,13 @@ banco, e a imagem Docker é construída e executada de verdade.
 
 ```bash
 # backend
-dotnet build Flow.sln                 # 0 erros, 0 avisos
+dotnet build Flow.sln -c Release      # 0 erros, 0 avisos
 export FLOW_TEST_MONGO_URI="mongodb://127.0.0.1:27017/?replicaSet=rs0"
-dotnet test Flow.sln                  # 313 testes
+dotnet test Flow.sln                  # 332 testes
+
+# contratos dos scripts de entrega
+node --test scripts/*.test.mjs                  # 10 testes
+bash scripts/build-artifacts.contract.test.sh   # 15 verificações, precisa de MongoDB
 
 # mobile
 cd mobile

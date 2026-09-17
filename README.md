@@ -1,5 +1,7 @@
 # Flow
 
+[![CI](https://github.com/eliasandraade/flow-app/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/eliasandraade/flow-app/actions/workflows/ci.yml?query=branch%3Amain)
+
 Plataforma de **gestão do ciclo de vida da inovação corporativa**: conecta um problema de
 chão de fábrica a uma ideia, a ideia a uma decisão fundamentada, a decisão a um projeto
 formal e o projeto a um resultado de negócio medido.
@@ -329,10 +331,10 @@ dotnet test
 ```text
 Flow.Domain.Tests          124   invariantes, máquinas de estado, FlowScore
 Flow.Application.Tests      10   aritmética do dashboard nos casos de borda
-Flow.Architecture.Tests      9   fronteiras entre as camadas
-Flow.Integration.Tests     170   MongoDB real, transações reais, API ponta a ponta
+Flow.Architecture.Tests     16   fronteiras entre as camadas e contrato da CI
+Flow.Integration.Tests     182   MongoDB real, transações reais, API ponta a ponta
 ─────────────────────────────
-Total                      313
+Total                      332
 ```
 
 Os testes de integração usam um **MongoDB real e descartável**. Se `FLOW_TEST_MONGO_URI`
@@ -346,6 +348,16 @@ não foram creditados e a notificação não foi criada.
 ```bash
 dotnet test --filter "FullyQualifiedName~TransactionalIntegrity"
 ```
+
+Os scripts de entrega têm contratos próprios, e a CI roda os dois:
+
+```bash
+node --test scripts/*.test.mjs                  # 10 testes: origem e identidade do openapi.json
+bash scripts/build-artifacts.contract.test.sh   # 15 verificações: sem entrega com suíte vermelha
+```
+
+O segundo executa o `build-artifacts.sh` de verdade três vezes e precisa de um MongoDB
+acessível, como os testes de integração.
 
 ---
 
@@ -563,13 +575,18 @@ src/
 tests/
   Flow.Domain.Tests/
   Flow.Application.Tests/
+  Flow.Architecture.Tests/
   Flow.Integration.Tests/
 
 mobile/
   src/                  api, components, navigation, screens, store, notifications
 
 scripts/
-  build-artifacts.sh
+  build-artifacts.sh    empacota a entrega em dist/
+  check-openapi.mjs     confere a origem do openapi.json exportado
+
+.github/workflows/
+  ci.yml                build, testes, mobile, Docker e artefatos
 
 docs/
   sprint-2/             documentação desta sprint

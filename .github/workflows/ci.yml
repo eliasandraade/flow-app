@@ -1,18 +1,15 @@
 name: CI
 
-# Pushes cover the branches we work on directly. Pull requests cover everything else, and
-# that is not only forks: a branch of this repository proposing a merge into master is not
-# covered by the push trigger either, so skipping its pull request run means the change
-# reaches master with nothing having looked at it.
-#
-# The overlap is real but small — a pull request opened from master or sprint-2 itself gets
-# built twice for the same commit. That is the entire cost of the simple rule, and it is
-# worth far less than knowing every proposed merge was actually validated.
+# This is the public delivery repository, and main is its only long-lived branch. Pushes to
+# main are validated directly. Pull requests into main are validated too, and that is not
+# only forks: a branch of this repository proposing a merge is not covered by the push
+# trigger, so skipping its pull request run would let the change reach main with nothing
+# having looked at it. No job opts out of either event.
 on:
   push:
-    branches: [master, sprint-2]
+    branches: [main]
   pull_request:
-    branches: [master, sprint-2]
+    branches: [main]
 
 # A new commit makes the previous run obsolete. Cancelling it frees the runner instead of
 # spending minutes proving something about code nobody will merge.

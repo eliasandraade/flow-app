@@ -208,7 +208,7 @@ notificação não foi criada**.
 dotnet test
 ```
 
-**313 testes**, sendo 170 de integração contra um MongoDB real e descartável, com replica
+**332 testes**, sendo 182 de integração contra um MongoDB real e descartável, com replica
 set e transações reais. Nenhum fake nos fluxos críticos.
 
 ### Degradação
@@ -245,7 +245,7 @@ Uma frase para cada coisa que o Flow prova:
 3. **IA com governança** — aconselha, nunca decide, registra toda execução e diz quando não
    tem evidência.
 4. **Degradação previsível** — Gemini fora, OneSignal fora, o produto continua de pé.
-5. **Verificado, não afirmado** — 313 testes, incluindo o rollback transacional.
+5. **Verificado, não afirmado** — 332 testes, incluindo o rollback transacional.
 
 ---
 
