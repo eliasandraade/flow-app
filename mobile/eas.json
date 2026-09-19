@@ -31,7 +31,9 @@
       },
       "env": {
         "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_API_URL": "https://flow-api.example.com"
+        "EXPO_PUBLIC_API_URL": "https://flow-api.andradesystems.com.br",
+        "EXPO_PUBLIC_ONESIGNAL_APP_ID": "ff867788-a559-4e80-b92d-14b9d29026ea",
+        "EAS_PROJECT_ID": "6e9e4f64-2c3d-454a-963b-7d4fea58ab4b"
       }
     },
     "production-store": {
